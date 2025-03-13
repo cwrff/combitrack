@@ -1,7 +1,7 @@
 ﻿# Create combined hiking tracks from an OpenstreetMap network
 # Construction de combinaisons d'itinéraires à partir d'un maillage OpenStreetMap
 # Bernard HOUSSAIS - FF Randonnée 35 - bh35@orange.fr
-# Release 5.7 - Feb 2025
+# Release 5.7 - Mar 2025
 
 import sys
 from tkinter import *
@@ -12,9 +12,10 @@ from math import sqrt, cos
 deb = 0 # 0 .. 3 : level of debug prints
 Start_nodes_output = True  # output as waypoints in network GPX file
 
-print("\nCOMBITRACK - v5.7 - Feb 2025\n")
+print("\nCOMBITRACK - v5.7 - March 2025\n")
 
 maxGPXoutput = 20 # max number of GPX tracks output
+                  # may be modified by nbSol not empty
 
 # proposed quality (/10) for elementary OSM ways
 mark = {}
@@ -187,6 +188,7 @@ else:
     except:
         print("\nNB SOL : bad format")
         maxBest = 0
+    maxGPXoutput = maxBest # when nbSol not empty
 # keep and output "maxBest" best tracks
 
 def norm_string (s1): # s1 : string to normalize
@@ -455,7 +457,6 @@ def outSol(gf,numSol,sol):
     nd = startNode
     outNode(gf,startNode)
     for wm in sol:
-        #(nd,wm,x2,x3,totL,totQL) = elem
         w = wm.w
         Go = True
         while Go:
@@ -695,14 +696,13 @@ for idn in db.nodesDict:
                     wm.m = merged(nbm,nd,nn,lg,ql,ret)
                     if nn == nd: # merged way is a simple loop
                         wm.m.state = 0  # no return
-                    else:
-                        pwmRet2 = None
-                        # connect other end of merged way (node nn)
-                        lastWM = nn.headWM # loop on ways starting from nn
-                        while lastWM.w != prevWM.w:
-                            pwmRet2 = lastWM
-                            lastWM = lastWM.next
-                        lastWM.m = wm.m
+                    pwmRet2 = None
+                    # connect other end of merged way (node nn), even for loops
+                    lastWM = nn.headWM # search ways starting from nn
+                    while lastWM.w != prevWM.w:
+                        pwmRet2 = lastWM
+                        lastWM = lastWM.next
+                    lastWM.m = wm.m
                     mGPXFile.write('</trkseg> </trk>\n')
 
                     # Warning about nearly identical ways

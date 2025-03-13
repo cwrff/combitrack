@@ -1,7 +1,7 @@
 ﻿# Variant of combitrack.py : build a GPX library with combined roundtrips
 #    issued from an OSM network
 # Bernard HOUSSAIS - FF Randonnée 35 - bh35@orange.fr
-# Release 2.5 - Feb 2025
+# Release 2.6 - Mar 2025
 
 Slices = [5, 9, 12, 15, 20, 25, 30] # 5-9 km, 9-12 km, etc.
 Nb_tracks = [3, 5, 4, 5, 4, 4] # Max number of tracks for each slice
@@ -15,7 +15,7 @@ from math import sqrt, cos
 deb = 0 # 0 .. 3 : level of debug prints
 Start_nodes_output = True  # output as waypoints in network GPX file
 
-print("\nCOMBI BASE - Feb 2025\n")
+print("\nCOMBI BASE - March 2025\n")
 
 # proposed quality (/10) for elementary OSM ways
 mark = {}
@@ -340,13 +340,13 @@ class QLS():   # solution track (quality, length, stack of ways)
         self.t = T        
         self.s = S
 
-def beforeSol(s1,s2): # relation d'ordre entre solutions
+def beforeSol(s1,s2): # order relation between solutions
     if s1.t == s2.t:
         return s1.q > s2.q
     else:
         return s1.t < s2.t
 
-def fdiv(adsol):  # calcul de la diversité entre les solutions en 1 et en adsol
+def fdiv(adsol):  # diversity between solutions in 1 and in adsol
     if HSol[1].l > HSol[adsol].l:
         st1 = HSol[1].s
         L = HSol[1].l
@@ -355,26 +355,29 @@ def fdiv(adsol):  # calcul de la diversité entre les solutions en 1 et en adsol
         st1 = HSol[adsol].s
         L = HSol[adsol].l
         st2 = HSol[1].s
-    L1 = len(st1)
-    L2 = len(st2)
-    js = 0     # st1 et st2 ont souvent un début commun
-    while js < min(L1,L2) and st1[js] == st2[js]:
+    # L : length of longest track
+    Nb1 = len(st1)  # number of ways in st1, not length !
+    Nb2 = len(st2)
+    min12 = min(Nb1,Nb2)
+    js = 0     # st1 and st2 have often the same beginning
+    while js < min12 and st1[js].m.nbm == st2[js].m.nbm:
         js += 1
     Ldif = 0.0
-    for i in range(js,L1):
-        j = js
-        while j < L2 and st1[i] != st2[j]:
-            j += 1
-        if j >= L2: # élément de st1 absent de st2
-            Ldif += st1[i].m.length
+    for i1 in range(js,Nb1):
+        i2 = 0  # in return tracks, a way may appear twice
+        while i2 < Nb2 and st1[i1].m.nbm != st2[i2].m.nbm:
+            i2 += 1
+        if i2 >= Nb2: # element of st1 not in st2
+            Ldif += st1[i1].m.length
     return 10.0*Ldif/L
+    # identical : diversity 0 / fully different : diversity 10
     
-class objc():  # objet susceptible d'être conservé
+class objc():  # object maybe preserved
     def __init__(self,adoc):
-        self.adoc = adoc   # adresse dans le heaptree
-        self.td = []   # liste des diversités vs objets précédents
-        self.Dmin = 20.0 # Diversité minimum dans la tranche
-        self.Imin = 0
+        self.adoc = adoc   # adress in the heaptree
+        self.td = []   # list of diversities vs previous objects
+        self.Dmin = 20.0 # Minimum diversity in the slice
+        self.Imin = 0   # its index
 
 class initDb():
     def __init__(self):
@@ -593,6 +596,7 @@ for idn in db.nodesDict:
     if nd.nbArc > 2: # connection
         if startNode != None:
           nd.dist2Final=lgMax-sqrt((coefLat*(nd.lat-startNode.lat))**2+(coefLon*(nd.lon-startNode.lon))**2)
+          # roundtrip : Final = Start
         wm = nd.headWM
         pwmRet1 = None
         while wm != None: # loop on ways starting from nd
@@ -652,14 +656,13 @@ for idn in db.nodesDict:
                     wm.m = merged(nbm,nd,nn,lg,ql,ret)
                     if nn == nd: # merged way is a simple loop
                         wm.m.state = 0  # no return
-                    else:
-                        pwmRet2 = None
-                        # connect other end of merged way (node nn)
-                        lastWM = nn.headWM # loop on ways starting from nn
-                        while lastWM.w != prevWM.w:
-                            pwmRet2 = lastWM
-                            lastWM = lastWM.next
-                        lastWM.m = wm.m
+                    pwmRet2 = None
+                    # connect other end of merged way (node nn), even for loops
+                    lastWM = nn.headWM # loop on ways starting from nn
+                    while lastWM.w != prevWM.w:
+                        pwmRet2 = lastWM
+                        lastWM = lastWM.next
+                    lastWM.m = wm.m
                     mGPXFile.write('</trkseg> </trk>\n')
 
                     # Warning about nearly identical ways
@@ -859,7 +862,7 @@ while Go:
             Go = False  # avoid last way from StartNode for roundtrips
 # end main loop
 
-if not parse:  # Mise en forme des solutions
+if not parse:  # Output of solutions
   print('\n',nSol, "combination(s)\n")
   listFile.write(str(nSol)+" combination(s)\n\n")
 
@@ -903,7 +906,7 @@ if not parse and nSol > 0:  # output solutions
             Dmin = 20.0
             Imin = 0
 
-        Nobj = objc(hh) # New track, hh = his future adress
+        Nobj = objc(hh) # New track, hh = its future adress
         Nex += 1
 
         # diversity of new track vs previous tracks of the same slice
@@ -923,6 +926,7 @@ if not parse and nSol > 0:  # output solutions
         Toc[Noc] = Nobj
 
         if Noc == N and Dmin_obj > Dmin:
+            # new track to be kept in N
             # track in Imin removed by shifting of next ones
             for iq in range(Imin,N): # shift
                 Nobj = Toc[iq+1]
